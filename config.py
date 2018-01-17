@@ -48,8 +48,8 @@ train = dict(                               # Training parameters:
     adam_beta1              = 0.0,          # \beta_1
     adam_beta2              = 0.99,         # \beta_2
     adam_epsilon            = 1e-8,         # \epsilon
-    minibatch_default       = 16,           # Minibatch size for low resolutions.
-    minibatch_overrides     = {256:14, 512:6,  1024:3}, # Minibatch sizes for high resolutions.
+    minibatch_default       = 8,           # Minibatch size for low resolutions.
+    minibatch_overrides     = {256:3, 512:6,  1024:3}, # Minibatch sizes for high resolutions.
     rampup_kimg             = 40,           # Learning rate rampup.
     rampdown_kimg           = 0,            # Learning rate rampdown.
     lod_initial_resolution  = 4,            # Network resolution at the beginning.
@@ -97,9 +97,12 @@ loss = dict(                                # Loss function:
 
 #----------------------------------------------------------------------------
 # Configuration overrides for individual experiments.
+if 1:
+    run_desc = 'sar-128x128'
+    dataset = dict(h5_path='sar-data-128x128.h5', resolution=256, max_labels=0, mirror_augment=True, max_images=10000)
 
 # Section 6.3: "High-resolution image generation using CelebA-HQ dataset"
-if 1:
+if 0:
     run_desc = 'celeb-hq-1024x1024'
     dataset = dict(h5_path='celeba-hq-1024x1024.h5', resolution=1024, max_labels=0, mirror_augment=True, max_images=30000)
 
@@ -109,7 +112,7 @@ if 0:
                   'chair', 'churchoutdoor', 'classroom', 'conferenceroom', 'cow', 'diningroom', 'diningtable', 'dog', 'horse', 'kitchen',
                   'livingroom', 'motorbike', 'person', 'pottedplant', 'restaurant', 'sheep', 'sofa', 'tower', 'train', 'tvmonitor']
     category_idx = 0
-    
+
     name = categories[category_idx]
     if name == 'bedroom' or name == 'dog':
         run_desc = 'lsun-%s-256x256' % name
@@ -119,7 +122,7 @@ if 0:
         run_desc = 'lsun-%s-256x256-100k' % name
         h5_path = 'lsun-%s-256x256-100k.h5' % name
         mirror_augment = True
-        
+
     dataset = dict(h5_path=h5_path, resolution=256, max_labels=0, mirror_augment=mirror_augment)
     train.update(lod_training_kimg=800, lod_transition_kimg=800, total_kimg=20000, minibatch_overrides={})
     G.update(fmap_base=4096)

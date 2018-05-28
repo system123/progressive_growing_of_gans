@@ -22,10 +22,13 @@ def fp32(*values):
 #----------------------------------------------------------------------------
 # Generator loss function used in the paper (WGAN + AC-GAN).
 
-def G_wgan_acgan(G, D, opt, training_set, minibatch_size,
+def G_wgan_acgan(G, D, E, opt, training_set, minibatch_size, reals,
     cond_weight = 1.0): # Weight of the conditioning term.
 
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    # Alter a real latent variable slightly to generate a new image
+    latents_out = E.get_output_for(reals, is_training=True)
+    latents = latents_out + 0.05*tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+
     labels = training_set.get_random_labels_tf(minibatch_size)
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     fake_scores_out, fake_labels_out = fp32(D.get_output_for(fake_images_out, is_training=True))
@@ -40,7 +43,7 @@ def G_wgan_acgan(G, D, opt, training_set, minibatch_size,
 #----------------------------------------------------------------------------
 # Discriminator loss function used in the paper (WGAN-GP + AC-GAN).
 
-def D_wgangp_acgan(G, D, opt, training_set, minibatch_size, reals, labels,
+def D_wgangp_acgan(G, D, E, opt, training_set, minibatch_size, reals, labels,
     wgan_lambda     = 10.0,     # Weight for the gradient penalty term.
     wgan_epsilon    = 0.001,    # Weight for the epsilon term, \epsilon_{drift}.
     wgan_target     = 1.0,      # Target value for gradient magnitudes.
@@ -80,3 +83,22 @@ def D_wgangp_acgan(G, D, opt, training_set, minibatch_size, reals, labels,
     return loss
 
 #----------------------------------------------------------------------------
+
+#----------------------------------------------------------------------------
+# Generator loss function used in the paper (WGAN + AC-GAN).
+
+def E_recon(G, D, E, opt, training_set, minibatch_size, reals,
+    cond_weight = 1.0): # Weight of the conditioning term.
+
+    latents_out = fp32(E.get_output_for(reals, is_training=True))
+    labels = training_set.get_random_labels_tf(minibatch_size)
+    recon_images_out = fp32(G.get_output_for(latents_out, labels, is_training=True))
+    # Reconstruction loss
+    loss = tf.sqrt(tf.nn.l2_loss(reals - recon_images_out))
+
+    # with tf.device('/cpu:0'):
+    #     loss = tf.Print(loss, [loss], message="my Z-values:")
+
+    # loss = tf.sqrt(loss)
+
+    return loss

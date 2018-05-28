@@ -43,7 +43,7 @@ class TFRecordExporter:
         if not os.path.isdir(self.tfrecord_dir):
             os.makedirs(self.tfrecord_dir)
         assert(os.path.isdir(self.tfrecord_dir))
-        
+
     def close(self):
         if self.print_progress:
             print('%-40s\r' % 'Flushing data...', end='', flush=True)
@@ -90,10 +90,10 @@ class TFRecordExporter:
         assert labels.shape[0] == self.cur_images
         with open(self.tfr_prefix + '-rxx.labels', 'wb') as f:
             np.save(f, labels.astype(np.float32))
-            
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
 
@@ -166,7 +166,7 @@ class ThreadPool(object):
 
         def task_func(prepared, idx):
             return process_func(prepared)
-           
+
         def retire_result():
             processed, (prepared, idx) = self.get_result(task_func)
             results[idx] = processed
@@ -174,7 +174,7 @@ class ThreadPool(object):
                 yield post_func(results[retire_idx[0]])
                 results[retire_idx[0]] = None
                 retire_idx[0] += 1
-    
+
         for idx, item in enumerate(item_iterator):
             prepared = pre_func(item)
             results.append(None)
@@ -191,7 +191,7 @@ def display(tfrecord_dir):
     tfutil.init_tf({'gpu_options.allow_growth': True})
     dset = dataset.TFRecordDataset(tfrecord_dir, max_label_size='full', repeat=False, shuffle_mb=0)
     tfutil.init_uninited_vars()
-    
+
     idx = 0
     while True:
         try:
@@ -217,7 +217,7 @@ def extract(tfrecord_dir, output_dir):
     tfutil.init_tf({'gpu_options.allow_growth': True})
     dset = dataset.TFRecordDataset(tfrecord_dir, max_label_size=0, repeat=False, shuffle_mb=0)
     tfutil.init_uninited_vars()
-    
+
     print('Extracting images to "%s"' % output_dir)
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
@@ -247,7 +247,7 @@ def compare(tfrecord_dir_a, tfrecord_dir_b, ignore_labels):
     print('Loading dataset "%s"' % tfrecord_dir_b)
     dset_b = dataset.TFRecordDataset(tfrecord_dir_b, max_label_size=max_label_size, repeat=False, shuffle_mb=0)
     tfutil.init_uninited_vars()
-    
+
     print('Comparing datasets')
     idx = 0
     identical_images = 0
@@ -297,7 +297,7 @@ def create_mnist(tfrecord_dir, mnist_dir):
     assert np.min(labels) == 0 and np.max(labels) == 9
     onehot = np.zeros((labels.size, np.max(labels) + 1), dtype=np.float32)
     onehot[np.arange(labels.size), labels] = 1.0
-    
+
     with TFRecordExporter(tfrecord_dir, images.shape[0]) as tfr:
         order = tfr.choose_shuffled_order()
         for idx in range(order.size):
@@ -315,7 +315,7 @@ def create_mnistrgb(tfrecord_dir, mnist_dir, num_images=1000000, random_seed=123
     images = np.pad(images, [(0,0), (2,2), (2,2)], 'constant', constant_values=0)
     assert images.shape == (60000, 32, 32) and images.dtype == np.uint8
     assert np.min(images) == 0 and np.max(images) == 255
-    
+
     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
         rnd = np.random.RandomState(random_seed)
         for idx in range(num_images):
@@ -429,7 +429,7 @@ def create_lsun(tfrecord_dir, lmdb_dir, resolution=256, max_images=None):
                     print(sys.exc_info()[1])
                 if tfr.cur_images == max_images:
                     break
-        
+
 #----------------------------------------------------------------------------
 
 def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
@@ -439,7 +439,7 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
     expected_images = 202599
     if len(image_filenames) != expected_images:
         error('Expected to find %d images' % expected_images)
-    
+
     with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
         order = tfr.choose_shuffled_order()
         for idx in range(order.size):
@@ -459,7 +459,7 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads=4, num_task
     with open(os.path.join(celeba_dir, 'Anno', 'list_landmarks_celeba.txt'), 'rt') as file:
         landmarks = [[float(value) for value in line.split()[1:]] for line in file.readlines()[2:]]
         landmarks = np.float32(landmarks).reshape(-1, 5, 2)
-    
+
     print('Loading CelebA-HQ deltas from "%s"' % delta_dir)
     import scipy.ndimage
     import hashlib
@@ -484,7 +484,7 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads=4, num_task
     # Must use pillow version 3.1.1 for everything to work correctly.
     if getattr(PIL, 'PILLOW_VERSION', '') != '3.1.1':
         error('create_celebahq requires pillow version 3.1.1') # conda install pillow=3.1.1
-        
+
     # Must use libjpeg version 8d for everything to work correctly.
     img = np.array(PIL.Image.open(os.path.join(celeba_dir, 'img_celeba', '000001.jpg')))
     md5 = hashlib.md5()
@@ -553,23 +553,23 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads=4, num_task
             img += (np.median(img, axis=(0,1)) - img) * np.clip(mask, 0.0, 1.0)
             img = PIL.Image.fromarray(np.uint8(np.clip(np.round(img), 0, 255)), 'RGB')
             quad += pad[0:2]
-            
+
         # Transform.
         img = img.transform((4096, 4096), PIL.Image.QUAD, (quad + 0.5).flatten(), PIL.Image.BILINEAR)
         img = img.resize((1024, 1024), PIL.Image.ANTIALIAS)
         img = np.asarray(img).transpose(2, 0, 1)
-        
+
         # Verify MD5.
         md5 = hashlib.md5()
         md5.update(img.tobytes())
         assert md5.hexdigest() == fields['proc_md5'][idx]
-        
+
         # Load delta image and original JPG.
         with zipfile.ZipFile(os.path.join(delta_dir, 'deltas%05d.zip' % (idx - idx % 1000)), 'r') as zip:
             delta_bytes = zip.read('delta%05d.dat' % idx)
         with open(orig_path, 'rb') as file:
             orig_bytes = file.read()
-        
+
         # Decrypt delta image, using original JPG data as decryption key.
         algorithm = cryptography.hazmat.primitives.hashes.SHA256()
         backend = cryptography.hazmat.backends.default_backend()
@@ -577,10 +577,10 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads=4, num_task
         kdf = cryptography.hazmat.primitives.kdf.pbkdf2.PBKDF2HMAC(algorithm=algorithm, length=32, salt=salt, iterations=100000, backend=backend)
         key = base64.urlsafe_b64encode(kdf.derive(orig_bytes))
         delta = np.frombuffer(bz2.decompress(cryptography.fernet.Fernet(key).decrypt(delta_bytes)), dtype=np.uint8).reshape(3, 1024, 1024)
-        
+
         # Apply delta image.
         img = img + delta
-        
+
         # Verify MD5.
         md5 = hashlib.md5()
         md5.update(img.tobytes())
@@ -597,10 +597,12 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads=4, num_task
 
 def create_from_images(tfrecord_dir, image_dir, shuffle):
     print('Loading images from "%s"' % image_dir)
-    image_filenames = sorted(glob.glob(os.path.join(image_dir, '*')))
+    image_filenames = glob.glob(os.path.join(image_dir, '*'))
+    image_filenames.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+
     if len(image_filenames) == 0:
         error('No input images found')
-        
+
     img = np.asarray(PIL.Image.open(image_filenames[0]))
     resolution = img.shape[0]
     channels = img.shape[2] if img.ndim == 3 else 1
@@ -610,7 +612,7 @@ def create_from_images(tfrecord_dir, image_dir, shuffle):
         error('Input image resolution must be a power-of-two')
     if channels not in [1, 3]:
         error('Input images must be stored as RGB or grayscale')
-    
+
     with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
         order = tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
         for idx in range(order.size):
@@ -644,7 +646,7 @@ def execute_cmdline(argv):
         prog        = prog,
         description = 'Tool for creating, extracting, and visualizing Progressive GAN datasets.',
         epilog      = 'Type "%s <command> -h" for more information.' % prog)
-        
+
     subparsers = parser.add_subparsers(dest='command')
     subparsers.required = True
     def add_command(cmd, desc, example=None):
@@ -654,7 +656,7 @@ def execute_cmdline(argv):
     p = add_command(    'display',          'Display images in dataset.',
                                             'display datasets/mnist')
     p.add_argument(     'tfrecord_dir',     help='Directory containing dataset')
-  
+
     p = add_command(    'extract',          'Extract images from dataset.',
                                             'extract datasets/mnist mnist-images')
     p.add_argument(     'tfrecord_dir',     help='Directory containing dataset')

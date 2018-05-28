@@ -32,12 +32,42 @@ def generate_fake_images(run_id, snapshot=None, grid_size=[1,1], num_pngs=1, ima
     random_state = np.random.RandomState(random_seed)
 
     print('Loading network from "%s"...' % network_pkl)
-    G, D, Gs = misc.load_network_pkl(run_id, snapshot)
+    G, D, Gs, E = misc.load_network_pkl(run_id, snapshot)
 
     result_subdir = misc.create_result_subdir(config.result_dir, config.desc)
     for png_idx in range(num_pngs):
         print('Generating png %d / %d...' % (png_idx, num_pngs))
         latents = misc.random_latents(np.prod(grid_size), Gs, random_state=random_state)
+        labels = np.zeros([latents.shape[0], 0], np.float32)
+        images = Gs.run(latents, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
+        misc.save_image_grid(images, os.path.join(result_subdir, '%s%06d.png' % (png_prefix, png_idx)), [0,255], grid_size)
+    open(os.path.join(result_subdir, '_done.txt'), 'wt').close()
+
+def process_reals_full(x, dynamic_range):
+    x = tf.cast(x, tf.float32)
+    x = misc.adjust_dynamic_range(x, dynamic_range, [-1,1])
+    return(x)
+
+def generate_hard_negatives(run_id, snapshot=None, grid_size=[1,1], num_pngs=1, image_shrink=1, png_prefix=None, random_seed=1000, minibatch_size=8):
+    network_pkl = misc.locate_network_pkl(run_id, snapshot)
+    if png_prefix is None:
+        png_prefix = misc.get_id_string_for_network_pkl(network_pkl) + '-'
+    random_state = np.random.RandomState(random_seed)
+
+    print('Loading network from "%s"...' % network_pkl)
+    G, D, Gs, E = misc.load_network_pkl(run_id, snapshot)
+
+    data_set = dataset.load_dataset(data_dir=config.data_dir, verbose=True, **config.dataset)
+    data_set.configure(minibatch_size,0)
+
+    result_subdir = misc.create_result_subdir(config.result_dir, config.desc)
+    for png_idx in range(num_pngs):
+        reals, labels = data_set.get_minibatch_np(minibatch_size)
+
+        print('Generating png %d / %d...' % (png_idx, num_pngs))
+        latents = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
+        latents += 0.001*misc.random_latents(np.prod(grid_size), Gs, random_state=random_state)
+        
         labels = np.zeros([latents.shape[0], 0], np.float32)
         images = Gs.run(latents, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
         misc.save_image_grid(images, os.path.join(result_subdir, '%s%06d.png' % (png_prefix, png_idx)), [0,255], grid_size)
@@ -55,7 +85,7 @@ def generate_interpolation_video(run_id, snapshot=None, grid_size=[1,1], image_s
     random_state = np.random.RandomState(random_seed)
 
     print('Loading network from "%s"...' % network_pkl)
-    G, D, Gs = misc.load_network_pkl(run_id, snapshot)
+    G, D, Gs, E = misc.load_network_pkl(run_id, snapshot)
 
     print('Generating latent vectors...')
     shape = [num_frames, np.prod(grid_size)] + Gs.input_shape[1:] # [frame, image, channel, component]

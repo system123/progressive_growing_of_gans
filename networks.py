@@ -333,6 +333,7 @@ def Enc(
     fused_scale         = True,         # True = use fused conv2d + downscale2d, False = separate downscale2d layers.
     structure           = None,         # 'linear' = human-readable, 'recursive' = efficient, None = select automatically
     is_template_graph   = False,        # True = template graph constructed by the Network class, False = actual evaluation.
+    random_sample       = False,        # should we do random sampling, only used during training
     **kwargs):                          # Ignore unrecognized keyword args.
 
     resolution_log2 = int(np.log2(resolution))
@@ -346,6 +347,8 @@ def Enc(
     images_in.set_shape([None, num_channels, resolution, resolution])
     images_in = tf.cast(images_in, dtype)
     lod_in = tf.cast(tf.get_variable('lod', initializer=np.float32(0.0), trainable=False), dtype)
+
+    latent_size2 = latent_size*2 #we need double the variables for a VAE
 
     # Building blocks.
     def fromrgb(x, res): # res = 2..resolution_log2
@@ -370,7 +373,7 @@ def Enc(
                 with tf.variable_scope('Dense0'):
                     x = act(apply_bias(dense(x, fmaps=nf(res-2), use_wscale=use_wscale)))
                 with tf.variable_scope('Dense1'):
-                    x = apply_bias(dense(x, fmaps=latent_size, gain=1, use_wscale=use_wscale))
+                    x = apply_bias(dense(x, fmaps=latent_size2, gain=1, use_wscale=use_wscale))
                 if normalize_latents: x = pixel_norm(x, epsilon=pixelnorm_epsilon)
             return x
 
@@ -398,7 +401,20 @@ def Enc(
         latent_out = grow(2, resolution_log2 - 2)
 
     assert latent_out.dtype == tf.as_dtype(dtype)
-    latent_out = tf.identity(latent_out, name='latent_out')
-    return latent_out
+
+    mu = latent_out[:, :latent_size]
+    sd = latent_out[:, latent_size:]
+    epsilon = tf.random_normal([tf.shape(latent_out)[0], latent_size], 0.0, 1.0)
+
+    if random_sample:
+        z = mu + tf.multiply(epsilon, tf.exp(0.5*sd))
+    else:
+        z = mu + tf.multiply(epsilon, 0)
+
+    mu_out = tf.identity(mu, name='mu_out')
+    sd_out = tf.identity(sd, name='sd_out')
+    z_out = tf.identity(z, name='z_out')
+
+    return z_out, mu_out, sd_out
 
 #----------------------------------------------------------------------------

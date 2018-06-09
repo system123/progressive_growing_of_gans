@@ -254,7 +254,7 @@ class Optimizer:
         loss_scaling_inc    = 0.0005,
         loss_scaling_dec    = 1.0,
         **kwargs):
-        
+
         # Init fields.
         self.name               = name
         self.learning_rate      = tf.convert_to_tensor(learning_rate)

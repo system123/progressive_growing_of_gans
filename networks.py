@@ -406,15 +406,13 @@ def Enc(
     sd = latent_out[:, latent_size:]
     epsilon = tf.random_normal([tf.shape(latent_out)[0], latent_size], 0.0, 1.0)
 
-    if random_sample:
-        z = mu + tf.multiply(epsilon, tf.exp(0.5*sd))
-    else:
-        z = mu + tf.multiply(epsilon, 0)
+    z = mu + tf.multiply(epsilon, tf.exp(0.5*sd))
 
+    eps_out = tf.identity(epsilon, name='eps_out')
     mu_out = tf.identity(mu, name='mu_out')
     sd_out = tf.identity(sd, name='sd_out')
     z_out = tf.identity(z, name='z_out')
 
-    return z_out, mu_out, sd_out
+    return z_out, mu_out, sd_out, eps_out
 
 #----------------------------------------------------------------------------

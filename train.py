@@ -238,7 +238,7 @@ def train_progressive_gan(
         # Run training ops.
         for repeat in range(minibatch_repeats):
             # Train the auto encoder
-            tfutil.run([E_train_op], {lod_in: sched.lod, lrate_in: sched.E_lrate, minibatch_in: sched.minibatch})
+            # tfutil.run([E_train_op], {lod_in: sched.lod, lrate_in: sched.E_lrate, minibatch_in: sched.minibatch})
 
             for _ in range(D_repeats):
                 tfutil.run([D_train_op, Gs_update_op], {lod_in: sched.lod, lrate_in: sched.D_lrate, minibatch_in: sched.minibatch})

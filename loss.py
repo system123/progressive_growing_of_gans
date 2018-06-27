@@ -25,20 +25,33 @@ def fp32(*values):
 def G_wgan_acgan(G, D, E, opt, training_set, minibatch_size, reals,
     cond_weight = 1.0): # Weight of the conditioning term.
 
-    # Alter a real latent variable slightly to generate a new image
-    # latents_out = E.get_output_for(reals, is_training=True)
-    # latents = latents_out + 0.05*tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:], 0, 1)
+    z_out, mu_out, sd_out, eps_out = fp32(E.get_output_for(reals, is_training=True))
 
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
+    fake_images_out = G.get_output_for(z_out, labels, is_training=True)
+
+    # MODDING FROM HERE
+    with tf.name_scope('ReconPenalty'):
+        img_loss = tf.nn.l2_loss(reals - fake_images_out)
+        latent_loss = 0.5 * tf.reduce_sum( tf.exp(sd_out) + tf.square(mu_out) - 1.0 - sd_out, 1)
+
+    loss = img_loss + latent_loss
+
     fake_scores_out, fake_labels_out = fp32(D.get_output_for(fake_images_out, is_training=True))
-    loss = -fake_scores_out
+    # ADDED THE += INSTEAD OF JUST =
+    loss += -fake_scores_out
 
     if D.output_shapes[1][1] > 0:
         with tf.name_scope('LabelPenalty'):
             label_penalty_fakes = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=fake_labels_out)
         loss += label_penalty_fakes * cond_weight
+
+    #  THIS IS NEW D(G(z))
+    z = tf.random_normal(tf.shape(z_out), 0.0, 1.0)
+    fake_images_out = G.get_output_for(tf.identity(z, name="z"), labels, is_training=True)
+    fake_scores_out, fake_labels_out = fp32(D.get_output_for(fake_images_out, is_training=True))
+    loss += -fake_scores_out
+
     return loss
 
 #----------------------------------------------------------------------------
@@ -91,14 +104,17 @@ def D_wgangp_acgan(G, D, E, opt, training_set, minibatch_size, reals, labels,
 def E_recon(G, D, E, opt, training_set, minibatch_size, reals,
     cond_weight = 1.0): # Weight of the conditioning term.
 
-    z_out, mu_out, sd_out = fp32(E.get_output_for(reals, is_training=True))
+    z_out, mu_out, sd_out, eps_out = fp32(E.get_output_for(reals, is_training=True))
     labels = training_set.get_random_labels_tf(minibatch_size)
+    # For reconstruction use only the mean
     recon_images_out = fp32(G.get_output_for(z_out, labels, is_training=True))
 
     with tf.name_scope('ReconPenalty'):
         img_loss = tf.nn.l2_loss(reals - recon_images_out)
         # img_loss = tf.reduce_sum(tf.squared_difference(recon_images_out, reals), 1)
-        latent_loss = -0.5 * tf.reduce_sum(1.0 + 2.0 * sd_out - tf.square(mu_out) - tf.exp(2.0 * sd_out), 1)
-    loss = tf.reduce_mean(img_loss + latent_loss)
+        # latent_loss = -0.5 * tf.reduce_sum(1.0 + 2.0 * sd_out - tf.square(mu_out) - tf.exp(2.0 * sd_out), 1)
+        latent_loss = 0.5 * tf.reduce_sum( tf.exp(sd_out) + tf.square(mu_out) - 1.0 - sd_out, 1)
+
+    loss = img_loss + latent_loss
 
     return loss

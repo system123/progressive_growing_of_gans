@@ -61,16 +61,16 @@ def generate_hard_negatives(run_id, snapshot=None, grid_size=[1,1], num_pngs=1, 
     data_set.configure(minibatch_size,0)
 
     result_subdir = misc.create_result_subdir(config.result_dir, config.desc)
-    for png_idx in range(num_pngs):
+    for png_idx in range(10):
         reals, labels = data_set.get_minibatch_np(minibatch_size)
 
-        print('Generating png %d / %d...' % (png_idx, num_pngs))
-        latents = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
-        latents += 0.001*misc.random_latents(np.prod(grid_size), Gs, random_state=random_state)
-        
-        labels = np.zeros([latents.shape[0], 0], np.float32)
-        images = Gs.run(latents, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
+        z_out, mu_out, sd_out = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
+        print('Generating png {} / {}... - latent code: {}'.format(png_idx, num_pngs, sd_out[:,:5] ))
+
+        labels = np.zeros([z_out.shape[0], 0], np.float32)
+        images = Gs.run(z_out, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
         misc.save_image_grid(images, os.path.join(result_subdir, '%s%06d.png' % (png_prefix, png_idx)), [0,255], grid_size)
+
     open(os.path.join(result_subdir, '_done.txt'), 'wt').close()
 
 #----------------------------------------------------------------------------

@@ -61,17 +61,36 @@ def generate_hard_negatives(run_id, snapshot=None, grid_size=[1,1], num_pngs=1, 
     data_set.configure(minibatch_size,0)
 
     result_subdir = misc.create_result_subdir(config.result_dir, config.desc)
-    for png_idx in range(10):
+    result_real_subdir = os.path.join(os.path.join(result_subdir, 'reals'))
+
+    os.mkdir(result_real_subdir)
+
+    lantents = np.zeros((num_pngs, 512))
+    mus = np.zeros((num_pngs, 512))
+    stds = np.zeros((num_pngs, 512))
+
+    for png_idx in range(num_pngs):
         reals, labels = data_set.get_minibatch_np(minibatch_size)
 
-        z_out, mu_out, sd_out = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
+        z_out, mu_out, sd_out, eps_out = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
         print('Generating png {} / {}... - latent code: {}'.format(png_idx, num_pngs, sd_out[:,:5] ))
 
+        z = mu_out + eps_out * np.exp(0.5*sd_out)
+
+        mus[png_idx,:] = mu_out
+        stds[png_idx,:] = sd_out
+        lantents[png_idx, :] = z
+        # z = mu_out + tf.multiply(0.5*eps_out, tf.exp(0.5*sd_out))
+        # z = mu_out + tf.exp(0.5*sd_out)
+
         labels = np.zeros([z_out.shape[0], 0], np.float32)
-        images = Gs.run(z_out, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
+        images = Gs.run(z, labels, minibatch_size=minibatch_size, num_gpus=config.num_gpus, out_mul=127.5, out_add=127.5, out_shrink=image_shrink, out_dtype=np.uint8)
         misc.save_image_grid(images, os.path.join(result_subdir, '%s%06d.png' % (png_prefix, png_idx)), [0,255], grid_size)
 
+        misc.save_image_grid(reals, os.path.join(result_real_subdir, '%s%06d.png' % (png_prefix, png_idx)), [0,255], grid_size)
+
     open(os.path.join(result_subdir, '_done.txt'), 'wt').close()
+    np.savez_compressed(os.path.join(result_subdir, 'latent_space.npz'), mu=mus, std=stds, z=lantents)
 
 #----------------------------------------------------------------------------
 # Generate MP4 video of random interpolations using a previously trained network.

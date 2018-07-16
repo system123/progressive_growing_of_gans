@@ -119,24 +119,23 @@ def D_wgangp_acgan(G, D, E, opt, training_set, minibatch_size, reals, labels,
 
 #----------------------------------------------------------------------------
 # Generator loss function used in the paper (WGAN + AC-GAN).
-for _ in range(D_repeats):
 def E_recon(G, D, E, opt, training_set, minibatch_size, reals,
     cond_weight = 1.0): # Weight of the conditioning term.
 
     z_out, mu_out, sd_out, eps_out = fp32(E.get_output_for(reals, is_training=True))
     labels = training_set.get_random_labels_tf(minibatch_size)
     fake_images_out = G.get_output_for(z_out, labels, is_training=True)
-    fake_scores_out, fake_labels_out = fp32(D.get_output_for(fake_images_out, is_training=True))
+    # fake_scores_out, fake_labels_out = fp32(D.get_output_for(fake_images_out, is_training=True))
 
     with tf.name_scope('ReconPenalty'):
         # Recon loss
-        img_loss = tf.nn.l2_loss(reals - recon_images_out)
+        img_loss = tf.nn.l2_loss(reals - fake_images_out)
         # KL-divergence
         latent_loss = KL_loss(mu_out, sd_out)
 
     img_size = D.input_shapes[0][1:]
 
-    loss = latent_loss/(tf.shape(z_out)[0]*tf.shape(z_out)[1]) - img_loss/(img_size[0]*img_size[1]*img_size[2])
+    loss = latent_loss/fp32(tf.shape(z_out)[0]*tf.shape(z_out)[1]) - img_loss/fp32(img_size[0]*img_size[1]*img_size[2])
     #
     #
     # z_out, mu_out, sd_out, eps_out = fp32(E.get_output_for(reals, is_training=True))

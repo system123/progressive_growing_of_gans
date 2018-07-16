@@ -72,10 +72,11 @@ def generate_hard_negatives(run_id, snapshot=None, grid_size=[1,1], num_pngs=1, 
     for png_idx in range(num_pngs):
         reals, labels = data_set.get_minibatch_np(minibatch_size)
 
-        z_out, mu_out, sd_out, eps_out = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
+        z_out, mu_out, sd_out = E.run(reals, minibatch_size=minibatch_size, num_gpus=config.num_gpus)
         print('Generating png {} / {}... - latent code: {}'.format(png_idx, num_pngs, sd_out[:,:5] ))
 
-        z = mu_out + eps_out * np.exp(0.5*sd_out)
+        eps_out = np.random.randn(1,512)
+        z = mu_out + np.exp(0.5*sd_out)
 
         mus[png_idx,:] = mu_out
         stds[png_idx,:] = sd_out
